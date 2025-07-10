@@ -1,0 +1,46 @@
+[
+  {"id":"1","type":"tab","label":"智能视频监控","disabled":false},
+  {"id":"tab1","type":"ui_tab","name":"视频监控","icon":"dashboard","order":1},
+  {"id":"group1","type":"ui_group","name":"监控面板","tab":"tab1","order":1,"disp":true,"width":12},
+
+  {"id":"video_iframe","type":"ui_template","z":"1","group":"group1","name":"实时视频","order":1,
+   "width":8,"height":20,
+   "format":"<iframe src=\"http://113.54.222.187:8500/video_feed\" width=\"100%\" height=\"480px\" frameborder=\"0\"></iframe>",
+   "storeOutMessages":false,"fwdInMessages":false,
+   "x":300,"y":60,"wires":[]},
+
+  {"id":"temp_btn","type":"ui_button","z":"1","group":"group1","name":"温度状态切换","order":2,"width":4,"height":1,
+   "label":"{{msg.label}}","color":"{{msg.color}}","bgcolor":"{{msg.bgcolor}}","icon":"fa-thermometer-half",
+   "x":420,"y":140,"wires":[["temp_toggle"]]},
+  {"id":"temp_toggle","type":"function","z":"1","name":"切换温度状态",
+    "func":
+    "let s=flow.get('temp_status')||'Normal';\n if(s==='Normal'){\n flow.set('temp_status','Warning');\n msg.label='⚠️ Warning'; msg.color='white'; msg.bgcolor='red';\n} else {\n flow.set('temp_status','Normal');\n msg.label='✅ Normal'; msg.color='white'; msg.bgcolor='blue';\n }\nreturn msg;",
+   "outputs":1,"x":600,"y":140,"wires":[["temp_btn"]]},
+
+  {"id":"people_inject","type":"inject","z":"1","name":"定时获取人数","props":[{"p":"payload"}],"repeat":"5","once":true,"onceDelay":0.5,"payload":"","payloadType":"date","x":420,"y":200,"wires":[["people_req"]]},
+  {"id":"people_req","type":"http request","z":"1","name":"GET /people_count","method":"GET","ret":"obj","url":"http://113.54.222.187:8500/people_count","x":600,"y":200,"wires":[["people_process"]]},
+  {"id":"people_process","type":"function","z":"1","name":"提取人数","func":"msg.payload=msg.payload.count;return msg;","outputs":1,"x":780,"y":200,"wires":[["people_text"]]},
+  {"id":"people_text","type":"ui_text","z":"1","group":"group1","order":3,"width":4,"height":1,"name":"人数统计","label":"检测人数：","format":"{{msg.payload}} 人","layout":"row-spread","x":960,"y":200,"wires":[]},
+
+  {"id":"btn_start","type":"ui_button","z":"1","group":"group1","order":4,"width":2,"height":1,"label":"开始录制","icon":"fa-circle","x":420,"y":260,"wires":[["http_start"]]},
+  {"id":"btn_stop","type":"ui_button","z":"1","group":"group1","order":4,"width":2,"height":1,"label":"停止录制","icon":"fa-stop","x":560,"y":260,"wires":[["http_stop"]]},
+  {"id":"btn_delete","type":"ui_button","z":"1","group":"group1","order":4,"width":2,"height":1,"label":"删除录制","icon":"fa-trash","x":700,"y":260,"wires":[["prep_delete"]]},
+  {"id":"recording_status","type":"ui_text","z":"1","group":"group1","order":4,"width":2,"height":1,"name":"录制状态","label":"状态：","format":"{{msg.payload}}","layout":"row-spread","x":840,"y":260,"wires":[]},
+   {"id":"http_start","type":"http request","z":"1","name":"POST /start_record","method":"POST","ret":"obj","url":"http://113.54.222.187:8500/start_record","x":600,"y":220,"wires":[["set_true","http_list"]]},
+  {"id":"http_stop","type":"http request","z":"1","name":"POST /stop_record","method":"POST","ret":"obj","url":"http://113.54.222.187:8500/stop_record","x":600,"y":300,"wires":[["set_false","http_list"]]},
+  {"id":"set_true","type":"function","z":"1","name":"设置录制中","func":"msg.payload='录制中';return msg;","outputs":1,"x":780,"y":220,"wires":[["recording_status"]]},
+  {"id":"set_false","type":"function","z":"1","name":"设置空闲","func":"msg.payload='空闲';return msg;","outputs":1,"x":780,"y":300,"wires":[["recording_status"]]},
+
+  {"id":"http_list","type":"http request","z":"1","name":"GET /list_recordings","method":"GET","ret":"obj","url":"http://113.54.222.187:8500/list_recordings","x":600,"y":360,"wires":[["build_dropdown"]]},
+  {"id":"build_dropdown","type":"function","z":"1","name":"生成文件列表","func":
+    "msg.options=msg.payload.map(f=>({label:f,value:f}));\n msg.payload=msg.payload[0]||'';\nreturn msg;",
+   "outputs":1,"x":780,"y":360,"wires":[["dropdown"]]},
+  {"id":"dropdown","type":"ui_dropdown","z":"1","group":"group1","order":5,"width":4,"height":1,"name":"录制列表","label":"选择录制文件","options":[],"payload":"","topic":"","x":420,"y":420,"wires":[["store_selected","http_list"]]},
+  {"id":"store_selected","type":"function","z":"1","name":"设置播放文件","func":"msg.payload=msg.payload;return msg;","outputs":1,"x":600,"y":420,"wires":[["play_template"]]},
+  {"id":"play_template","type":"ui_template","z":"1","group":"group1","name":"回放视频","order":6,"width":8,"height":12,"format":
+    "<div ng-if=\"msg.payload\"><video width=\"100%\" height=\"300\" controls><source ng-src=\"http://113.54.222.187:8500/recordings/{{msg.payload}}\" type=\"video/mp4\"></video><p>{{msg.payload}}</p></div><div ng-if=\"!msg.payload\"><p>未选择文件</p></div>",
+   "storeOutMessages":false,"fwdInMessages":false,"resendOnRefresh":true,"x":700,"y":480,"wires":[]},
+
+  {"id":"prep_delete","type":"function","z":"1","name":"准备删除","func":"msg.payload={filename:msg.payload};return msg;","outputs":1,"x":600,"y":300,"wires":[["http_delete"]]},
+  {"id":"http_delete","type":"http request","z":"1","name":"POST /delete_recording","method":"POST","ret":"obj","url":"http://113.54.222.187:8500/delete_recording","x":780,"y":300,"wires":[["http_list"]]}
+]
